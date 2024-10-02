@@ -1,9 +1,5 @@
 # ImageViewer.py
 # Program to start evaluating an image in python
-#
-# Show the image with:
-# os.startfile(imageList[n].filename)
-
 
 from tkinter import *
 import math, os
@@ -64,7 +60,7 @@ class ImageViewer(Frame):
         for i in range(len(self.imageList)):
             self.list.insert(i, self.imageList[i].filename)
         self.list.pack(side=LEFT, fill=BOTH)
-        self.list.activate(1)
+        self.list.activate(0)  # Set to the first item
         self.list.bind("<<ListboxSelect>>", self.update_preview)
         self.listScrollbar.config(command=self.list.yview)
 
@@ -114,41 +110,63 @@ class ImageViewer(Frame):
     # directory uses the comparison method of the passed
     # binList
     def find_distance(self, method):
-        return 0
+        distances = []
+        current_index = self.list.curselection()[0]
+        current_code = (
+            self.colorCode[current_index]
+            if method == "CC"
+            else self.intenCode[current_index]
+        )
 
-    # your code
+        for i in range(len(self.imageList)):
+            if i != current_index:
+                comparison_code = (
+                    self.colorCode[i] if method == "CC" else self.intenCode[i]
+                )
+                distance = sum(
+                    abs(a - b) for a, b in zip(current_code, comparison_code)
+                )
+                distances.append((self.imageList[i].filename, distance))
+
+        # Sort by distance
+        distances.sort(key=lambda x: x[1])
+        self.update_results(distances)
 
     # Update the results window with the sorted results.
     def update_results(self, sortedTup):
-        cols = int(math.ceil(math.sqrt(len(sortedTup))))
-        fullsize = (0, 0, (self.xmax * cols), (self.ymax * cols))
-
-        # Initialize the canvas with dimensions equal to the
-        # number of results.
         self.canvas.delete(ALL)
+        cols = int(math.ceil(math.sqrt(len(sortedTup))))
+        fullsize = (
+            0,
+            0,
+            (self.xmax * cols),
+            (self.ymax * (len(sortedTup) // cols + 1)),
+        )
+
+        # Initialize the canvas with dimensions equal to the number of results.
         self.canvas.config(
             width=self.xmax * cols,
-            height=self.ymax * cols / 2,
-            yscrollcommand=self.resultsScrollbar.set,
+            height=self.ymax * (len(sortedTup) // cols + 1) * 2,
             scrollregion=fullsize,
         )
         self.canvas.pack()
         self.resultsScrollbar.config(command=self.canvas.yview)
 
-        # your code
-
         # Place images on buttons, then on the canvas in order
-        # by distance.  Buttons envoke the inspect_pic method.
+        # by distance.
+        photoRemain = sortedTup
         rowPos = 0
         while photoRemain:
             photoRow = photoRemain[:cols]
             photoRemain = photoRemain[cols:]
             colPos = 0
-            for filename, img in photoRow:
-                link = Button(self.canvas, image=img)
+            for filename, _ in photoRow:
+                img_index = self.imageList.index(
+                    next(img for img in self.imageList if img.filename == filename)
+                )
+                link = Button(self.canvas, image=self.photoList[img_index])
                 handler = lambda f=filename: self.inspect_pic(f)
                 link.config(command=handler)
-                link.pack(side=LEFT, expand=YES)
                 self.canvas.create_window(
                     colPos,
                     rowPos,
@@ -161,8 +179,7 @@ class ImageViewer(Frame):
 
             rowPos += self.ymax
 
-    # Open the picture with the default operating system image
-    # viewer.
+    # Open the picture with the default operating system image viewer.
     def inspect_pic(self, filename):
         os.startfile(filename)
 
@@ -177,7 +194,6 @@ if __name__ == "__main__":
     resultWin.protocol("WM_DELETE_WINDOW", lambda: None)
 
     pixInfo = PixInfo(root)
-
     imageViewer = ImageViewer(root, pixInfo, resultWin)
 
     root.mainloop()

@@ -3,6 +3,7 @@
 
 from PIL import Image, ImageTk  # Correct import for Pillow
 import glob, os, math
+import tkinter as tk
 
 
 # Pixel Info class.
@@ -56,11 +57,16 @@ class PixInfo:
         CcBins = [0] * 64
         InBins = [0] * 25
 
-        # Placeholder for bin encoding logic
-        # Add your encoding logic here
+        for r, g, b in pixlist:
+            r_bin = r // 64
+            g_bin = g // 64
+            b_bin = b // 64
+            color_index = (r_bin * 8) + (g_bin * 4) + b_bin
+            CcBins[color_index] += 1
 
-        # Return the list of binary digits, one digit for each
-        # pixel.
+            intensity = (r + g + b) // 3
+            InBins[intensity // 10] += 1
+
         return CcBins, InBins
 
     # Accessor functions:
@@ -81,3 +87,13 @@ class PixInfo:
 
     def get_intenCode(self):
         return self.intenCode
+
+
+def main():
+    root = tk.Tk()
+    pix_info = PixInfo(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
