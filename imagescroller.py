@@ -1,8 +1,15 @@
 import tkinter as tk
 from tkinter import Scrollbar, Canvas, Frame
+from turtle import color
 from PIL import Image, ImageTk  # Pillow for handling image formats
 import glob
+from pathlib import Path
 import random
+
+rows, cols = 100, 25
+intensity_histogram = [[0 for _ in range(cols)] for _ in range(rows)]
+color_histogram = [[0 for _ in range(64)] for _ in range(rows)]
+current_selected_img = ""
 
 
 def randomize(arr):
@@ -11,9 +18,21 @@ def randomize(arr):
 
 # Function to show the selected image in a larger view
 def show_selected_image(tk_image, image_path):
-    # Resize the image for larger display
+    # Open the original image
     img = Image.open(image_path)
-    img = img.resize((600, 600))  # Change the size as needed
+    current_selected_img = image_path
+
+    # Get the original dimensions of the image
+    original_width, original_height = img.size
+
+    # Double the size of the image
+    new_width = original_width * 2
+    new_height = original_height * 2
+
+    # Resize the image while maintaining its original aspect ratio
+    img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+    # Convert to a Tkinter-compatible image
     large_image = ImageTk.PhotoImage(img)
 
     # Update the displayed image
@@ -41,6 +60,8 @@ def display_images():
         )  # Arrange images in a grid
 
 
+# Function to sort by Intensity
+
 # Create the main window
 window = tk.Tk()
 window.title("100 Images Viewer")
@@ -57,15 +78,24 @@ selected_image_label.pack(side="left")  # Position it on the left of the frame
 button_frame = tk.Frame(top_frame)
 button_frame.pack(side="right", expand=True)  # Use expand to allow for centering
 
+rows, columns = 2, 1
 # Create a grid for buttons
-for i in range(4):  # 2 rows
-    for j in range(2):  # 4 columns
+for i in range(rows):
+    for j in range(columns):
         button = tk.Button(
-            button_frame, text=f"Button {i*2 + j + 1}", width=15, height=2
+            button_frame, text=f"Button {i * 2 + j + 1}", width=15, height=2
         )
         button.grid(
             row=i, column=j, padx=5, pady=5, sticky="nsew"
         )  # Sticky to fill the cell
+
+button = tk.Button(
+    button_frame,
+    text="Sort by Intensity",
+    width=15,
+    height=2,
+    command=lambda: randomize(),
+)
 
 # Configure grid weights to make it center
 for i in range(2):
@@ -90,10 +120,14 @@ canvas.configure(yscrollcommand=scrollbar.set)
 canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
 
-# Load and display images (adjust the path and use a wildcard to match multiple images)
-image_paths = glob.glob(
-    r"C:\Users\Khang\Python\images\*.jpg"
-)  # Load all jpg images from the folder
+# Get the home directory of the user
+home_dir = Path.home()
+
+# Define a relative path from the home directory to the images folder
+image_folder = home_dir / "Python" / "images"
+
+# Use a wildcard to match .jpg images
+image_paths = list(image_folder.glob("*.jpg"))
 
 # Limit to 100 images if there are more
 image_paths = image_paths[:100]
@@ -101,9 +135,50 @@ image_paths = image_paths[:100]
 # Keep a reference to the PhotoImage objects to avoid garbage collection
 photo_images = []
 
+# Define the maximum dimensions for the grid cells
+max_width, max_height = 160, 160
+
+# Define the target dimensions for the grid cells (150x150)
+target_size = 150
+counter = 0
 for image_path in image_paths:
     img = Image.open(image_path)  # Open the image file
-    img = img.resize((150, 150))  # Resize the image to fit within the grid
+
+    # Image Processing
+    width, height = img.size
+    pixels = img.load()
+    for x in range(width):
+        for y in range(height):
+            rgbvals = pixels[x, y]
+            intensity = (int)(
+                rgbvals[0] * 0.299 + rgbvals[1] * 0.587 + rgbvals[2] * 0.114
+            )
+            histobin = (int)(intensity / 10)
+            if histobin == 25:
+                histobin -= 1
+            intensity_histogram[counter][histobin] += 1
+
+    counter += 1
+    # Get the original dimensions of the image
+    width, height = img.size
+
+    # Determine the dimensions to crop a square
+    if width > height:
+        # Crop width to make it a square
+        left = (width - height) // 2
+        right = left + height
+        top, bottom = 0, height
+    else:
+        # Crop height to make it a square
+        top = (height - width) // 2
+        bottom = top + width
+        left, right = 0, width
+
+    # Crop the image to a square
+    img = img.crop((left, top, right, bottom))
+
+    # Resize the square image to fit the grid cell
+    img = img.resize((target_size, target_size), Image.Resampling.LANCZOS)
 
     tk_image = ImageTk.PhotoImage(img)  # Convert image to PhotoImage
     photo_images.append((tk_image, image_path))  # Keep a reference and the file path
