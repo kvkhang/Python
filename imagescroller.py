@@ -1,3 +1,4 @@
+from ast import Num
 import tkinter as tk
 from tkinter import Scrollbar, Canvas, Frame
 from turtle import color
@@ -6,21 +7,24 @@ import glob
 from pathlib import Path
 import random
 
+WIDTH = 384
+HEIGHT = 256
 rows, cols = 100, 25
 intensity_histogram = [[0 for _ in range(cols)] for _ in range(rows)]
 color_histogram = [[0 for _ in range(64)] for _ in range(rows)]
-current_selected_img = ""
+current_selected_img = ("", -1)
 
 
 def randomize(arr):
     random.shuffle(arr)  # Shuffle the array in place
+    display_images()
 
 
 # Function to show the selected image in a larger view
-def show_selected_image(tk_image, image_path):
+def show_selected_image(tk_image, image_path, n):
     # Open the original image
     img = Image.open(image_path)
-    current_selected_img = image_path
+    current_selected_img = (image_path, n)
 
     # Get the original dimensions of the image
     original_width, original_height = img.size
@@ -40,6 +44,10 @@ def show_selected_image(tk_image, image_path):
     selected_image_label.image = (
         large_image  # Keep a reference to avoid garbage collection
     )
+    print(image_path)
+    print(photo_images[n])
+    print(intensity_histogram[n])
+    print(current_selected_img)
 
 
 # Function to display images as buttons
@@ -47,12 +55,12 @@ def display_images():
     for widget in scrollable_frame.winfo_children():
         widget.destroy()  # Clear existing images
 
-    for i, (tk_image, image_path) in enumerate(photo_images):
+    for i, (tk_image, image_path, n) in enumerate(photo_images):
         button = tk.Button(
             scrollable_frame,
             image=tk_image,
-            command=lambda img=tk_image, path=image_path: show_selected_image(
-                img, path
+            command=lambda img=tk_image, path=image_path, num=n: show_selected_image(
+                img, path, num
             ),
         )
         button.grid(
@@ -61,6 +69,21 @@ def display_images():
 
 
 # Function to sort by Intensity
+def sort_by_distance(photo_arr, histogram):
+    distances = [0.0 for _ in range(rows)]
+    for x in range(len(histogram)):
+        print(x)
+        calculated_distance = 0
+        for y in range(len(histogram[x])):
+            calculated_distance += abs(
+                (float)(
+                    (histogram[current_selected_img[1]][y] + histogram[x][y])
+                    / (width * height)
+                )
+            )
+        print(calculated_distance)
+        distances[x] = calculated_distance
+
 
 # Create the main window
 window = tk.Tk()
@@ -79,24 +102,16 @@ button_frame = tk.Frame(top_frame)
 button_frame.pack(side="right", expand=True)  # Use expand to allow for centering
 
 rows, columns = 2, 1
-# Create a grid for buttons
-for i in range(rows):
-    for j in range(columns):
-        button = tk.Button(
-            button_frame, text=f"Button {i * 2 + j + 1}", width=15, height=2
-        )
-        button.grid(
-            row=i, column=j, padx=5, pady=5, sticky="nsew"
-        )  # Sticky to fill the cell
 
 button = tk.Button(
     button_frame,
     text="Sort by Intensity",
     width=15,
     height=2,
-    command=lambda: randomize(),
+    command=lambda: sort_by_distance(photo_images, intensity_histogram),
 )
 
+button.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
 # Configure grid weights to make it center
 for i in range(2):
     button_frame.grid_rowconfigure(i, weight=1)  # Allow rows to expand
@@ -143,7 +158,7 @@ target_size = 150
 counter = 0
 for image_path in image_paths:
     img = Image.open(image_path)  # Open the image file
-
+    print(image_path, " ", counter)
     # Image Processing
     width, height = img.size
     pixels = img.load()
@@ -158,7 +173,6 @@ for image_path in image_paths:
                 histobin -= 1
             intensity_histogram[counter][histobin] += 1
 
-    counter += 1
     # Get the original dimensions of the image
     width, height = img.size
 
@@ -181,9 +195,13 @@ for image_path in image_paths:
     img = img.resize((target_size, target_size), Image.Resampling.LANCZOS)
 
     tk_image = ImageTk.PhotoImage(img)  # Convert image to PhotoImage
-    photo_images.append((tk_image, image_path))  # Keep a reference and the file path
+    photo_images.append(
+        (tk_image, image_path, counter)
+    )  # Keep a reference and the file path
+    counter += 1
 
 # Display images initially
+photo_images.sort(key=lambda x: x[2])
 display_images()
 
 # Start the Tkinter event loop
