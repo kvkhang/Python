@@ -104,61 +104,50 @@ def sort_by_distance(photo_arr, histogram):
 window = tk.Tk()
 window.title("100 Images Viewer")
 
-# Set window size and background color for a cleaner UI
-window.geometry("800x600")
-window.configure(bg="#f0f0f0")
+# Create a frame for the selected image and buttons
+top_frame = tk.Frame(window)
+top_frame.pack(side="top", fill="x", padx=10, pady=10)  # Fill horizontally
 
-# Create a frame for the selected image and buttons, aligned on the right
-top_frame = tk.Frame(window, bg="#e6e6e6", borderwidth=2, relief="solid")
-top_frame.pack(side="right", fill="y", padx=10, pady=10)  # Fill vertically
+# Create a label to display the selected image
+selected_image_label = tk.Label(top_frame)
+selected_image_label.pack(side="left")  # Position it on the left of the frame
 
-# Create a label to display the selected image with padding
-selected_image_label = tk.Label(
-    top_frame, text="No Image Selected", bg="white", borderwidth=2, relief="solid"
-)
-selected_image_label.pack(
-    side="top", padx=10, pady=10, fill="both", expand=True
-)  # Fill the space on the top
+# Create a frame for buttons
+button_frame = tk.Frame(top_frame)
+button_frame.pack(side="right", expand=True)  # Use expand to allow for centering
 
-# Create a frame for buttons below the image display
-button_frame = tk.Frame(top_frame, bg="#e6e6e6")
-button_frame.pack(side="bottom", fill="both", expand=True)
+rows, columns = 2, 1
 
-# Sort by Intensity button
 intensity_button = tk.Button(
     button_frame,
     text="Sort by Intensity",
-    width=20,
+    width=15,
     height=2,
-    bg="#d3d3d3",  # Light gray for neutral actions
-    fg="#000000",  # Black text for clarity
     command=lambda: sort_by_distance(photo_images, intensity_histogram),
 )
-intensity_button.grid(row=0, column=0, padx=10, pady=5, sticky="nsew")
 
-# Sort by Color Code button
+intensity_button.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+
 colorcode_button = tk.Button(
     button_frame,
     text="Sort by Color Code",
-    width=20,
+    width=15,
     height=2,
-    bg="#87ceeb",  # Light blue to differentiate this button
-    fg="#000000",
     command=lambda: sort_by_distance(photo_images, color_histogram),
 )
-colorcode_button.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
+colorcode_button.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
 
-# Configure grid weights for responsive buttons
-button_frame.grid_rowconfigure(0, weight=1)  # Ensure the rows can expand
-button_frame.grid_rowconfigure(1, weight=1)
-button_frame.grid_columnconfigure(0, weight=1)
+# Configure grid weights to make it center
+for i in range(2):
+    button_frame.grid_rowconfigure(i, weight=1)  # Allow rows to expand
+for j in range(4):
+    button_frame.grid_columnconfigure(j, weight=1)  # Allow columns to expand
 
-# Create a scrollable canvas for image thumbnails on the left
-canvas = Canvas(window, bg="#ffffff")
+# Create a scrollable canvas
+canvas = Canvas(window)
 scrollbar = Scrollbar(window, orient="vertical", command=canvas.yview)
-scrollable_frame = Frame(canvas, bg="#f9f9f9")
+scrollable_frame = Frame(canvas)
 
-# Add scrollable functionality
 scrollable_frame.bind(
     "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
 )
@@ -168,33 +157,8 @@ canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
 canvas.configure(yscrollcommand=scrollbar.set)
 
 # Pack the canvas and scrollbar in the main window
-canvas.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
-
-# Variables to keep track of drag position
-start_x = 0
-start_y = 0
-
-
-# Functions to enable scrolling by dragging the mouse
-def on_drag_start(event):
-    global start_x, start_y
-    start_x = event.x
-    start_y = event.y
-
-
-def on_drag_motion(event):
-    # Calculate the difference in movement
-    delta_x = start_x - event.x
-    delta_y = start_y - event.y
-    canvas.xview_scroll(int(delta_x), "units")  # Scroll horizontally
-    canvas.yview_scroll(int(delta_y), "units")  # Scroll vertically
-
-
-# Bind mouse events to the canvas for dragging
-canvas.bind("<ButtonPress-1>", on_drag_start)
-canvas.bind("<B1-Motion>", on_drag_motion)
-
 
 # Get the home directory of the user
 home_dir = Path.home()
@@ -212,10 +176,10 @@ image_paths = image_paths[:100]
 photo_images = []
 
 # Define the maximum dimensions for the grid cells
-max_width, max_height = 90, 90
+max_width, max_height = 160, 160
 
 # Define the target dimensions for the grid cells (150x150)
-target_size = 90
+target_size = 150
 counter = 0
 for image_path in image_paths:
     img = Image.open(image_path)  # Open the image file
