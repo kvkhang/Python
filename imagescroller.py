@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import Scrollbar, Canvas, Frame
 from PIL import Image, ImageTk  # Pillow for handling image formats
 from pathlib import Path
+import glob
 import random
 
 WIDTH = 384
@@ -53,15 +54,25 @@ def display_images():
 
     # Loop through photo_images to display the images as buttons
     for i, (tk_image, image_path, n) in enumerate(photo_images):
+        # Create a frame to hold both the button and the label
+        frame = tk.Frame(scrollable_frame)
+        
+        # Create the button
         button = tk.Button(
-            scrollable_frame,
+            frame,
             image=tk_image,
-            command=lambda img=tk_image, path=image_path, num=n: show_selected_image(
-                img, path, num
-            ),
+            command=lambda img=tk_image, path=image_path, num=n: show_selected_image(img, path, num),
         )
-        # Arrange the buttons in a grid, 10 per row
-        button.grid(row=i // 10, column=i % 10, padx=5, pady=5)
+        button.pack()
+
+        # Create a label to show the image name (basename)
+        image_name = image_path.name  # Get the name of the file
+        label = tk.Label(frame, text=image_name)
+        label.pack()
+
+        # Arrange the frame in a grid, 10 per row
+        frame.grid(row=i // 10, column=i % 10, padx=5, pady=5)
+
 
 
 # Function to sort by Intensity
@@ -87,7 +98,7 @@ def sort_by_distance(photo_arr, histogram):
 
     # Sorting photo_arr based on the calculated distances
     sorted_photo_arr = [photo for _, photo in sorted(zip(distances, photo_arr))]
-
+    
     # Update the global photo_images with the sorted array
     photo_images[:] = sorted_photo_arr  # Update in place
 
@@ -197,7 +208,7 @@ canvas.bind("<B1-Motion>", on_drag_motion)
 home_dir = Path.home()
 
 # Define a relative path from the home directory to the images folder
-image_folder = home_dir / "Python" / "images"
+image_folder = home_dir / "css484yippee" / "images"
 
 # Use a wildcard to match .jpg images
 image_paths = list(image_folder.glob("*.jpg"))
