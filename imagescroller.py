@@ -1,10 +1,6 @@
-from ast import Num
-from math import dist
 import tkinter as tk
 from tkinter import Scrollbar, Canvas, Frame
-from turtle import color
 from PIL import Image, ImageTk  # Pillow for handling image formats
-import glob
 from pathlib import Path
 import random
 
@@ -51,9 +47,11 @@ def show_selected_image(tk_image, image_path, n):
 
 # Function to display images as buttons
 def display_images():
+    # Clear all widgets in the scrollable frame
     for widget in scrollable_frame.winfo_children():
-        widget.destroy()  # Clear existing images
+        widget.destroy()
 
+    # Loop through photo_images to display the images as buttons
     for i, (tk_image, image_path, n) in enumerate(photo_images):
         button = tk.Button(
             scrollable_frame,
@@ -62,9 +60,8 @@ def display_images():
                 img, path, num
             ),
         )
-        button.grid(
-            row=i // 10, column=i % 10, padx=5, pady=5
-        )  # Arrange images in a grid
+        # Arrange the buttons in a grid, 10 per row
+        button.grid(row=i // 10, column=i % 10, padx=5, pady=5)
 
 
 # Function to sort by Intensity
