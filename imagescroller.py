@@ -4,6 +4,7 @@ from PIL import Image, ImageTk  # Pillow for handling image formats
 from pathlib import Path
 import glob
 import random
+import os
 
 WIDTH = 384
 HEIGHT = 256
@@ -207,11 +208,13 @@ canvas.bind("<ButtonPress-1>", on_drag_start)
 canvas.bind("<B1-Motion>", on_drag_motion)
 
 
-# Get the home directory of the user
-home_dir = Path.home()
+folder_name = "images"  # Replace with your folder name
 
-# Define a relative path from the home directory to the images folder
-image_folder = home_dir / "css484yippee" / "images"
+# Create a Path object
+current_directory = Path.cwd()
+folder_path = current_directory / folder_name
+
+image_folder = folder_path
 
 # Use a wildcard to match .jpg images
 image_paths = list(image_folder.glob("*.jpg"))
