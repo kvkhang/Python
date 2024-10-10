@@ -56,12 +56,14 @@ def display_images():
     for i, (tk_image, image_path, n) in enumerate(photo_images):
         # Create a frame to hold both the button and the label
         frame = tk.Frame(scrollable_frame)
-        
+
         # Create the button
         button = tk.Button(
             frame,
             image=tk_image,
-            command=lambda img=tk_image, path=image_path, num=n: show_selected_image(img, path, num),
+            command=lambda img=tk_image, path=image_path, num=n: show_selected_image(
+                img, path, num
+            ),
         )
         button.pack()
 
@@ -72,7 +74,6 @@ def display_images():
 
         # Arrange the frame in a grid, 10 per row
         frame.grid(row=i // 10, column=i % 10, padx=5, pady=5)
-
 
 
 # Function to sort by Intensity
@@ -97,8 +98,10 @@ def sort_by_distance(photo_arr, histogram):
         distances.append(calculated_distance)
 
     # Sorting photo_arr based on the calculated distances
-    sorted_photo_arr = [photo for _, photo in sorted(zip(distances, photo_arr))]
-    
+    sorted_photo_arr = [
+        photo for _, photo in sorted(zip(distances, photo_arr), key=lambda x: x[0])
+    ]
+
     # Update the global photo_images with the sorted array
     photo_images[:] = sorted_photo_arr  # Update in place
 
