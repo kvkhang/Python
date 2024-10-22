@@ -1,10 +1,6 @@
-from ast import Num
-from math import dist
 import tkinter as tk
-from tkinter import Scrollbar, Canvas, Frame
-from turtle import color
-from PIL import Image, ImageTk  # Pillow for handling image formats
-import glob
+from tkinter import Frame
+from PIL import Image, ImageTk
 from pathlib import Path
 import random
 
@@ -15,71 +11,91 @@ intensity_histogram = [[0 for _ in range(cols)] for _ in range(rows)]
 color_histogram = [[0 for _ in range(64)] for _ in range(rows)]
 current_selected_img = ("", -1)
 
+# Pagination variables
+current_page = 0
+images_per_page = 20
+
 
 def randomize(arr):
     random.shuffle(arr)  # Shuffle the array in place
     display_images()
 
 
-# Function to show the selected image in a larger view
 def show_selected_image(tk_image, image_path, n):
     global current_selected_img
 
-    # Open the original image
     img = Image.open(image_path)
     current_selected_img = (image_path, n)
 
-    # Get the original dimensions of the image
     original_width, original_height = img.size
-
-    # Double the size of the image
     new_width = original_width * 2
     new_height = original_height * 2
-
-    # Resize the image while maintaining its original aspect ratio
     img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-    # Convert to a Tkinter-compatible image
     large_image = ImageTk.PhotoImage(img)
 
-    # Update the displayed image
     selected_image_label.config(image=large_image)
-    selected_image_label.image = (
-        large_image  # Keep a reference to avoid garbage collection
-    )
+    selected_image_label.image = large_image
 
 
-# Function to display images as buttons
 def display_images():
+    global current_page
     for widget in scrollable_frame.winfo_children():
-        widget.destroy()  # Clear existing images
+        widget.destroy()
 
-    for i, (tk_image, image_path, n) in enumerate(photo_images):
+    start_index = current_page * images_per_page
+    end_index = start_index + images_per_page
+    current_images = photo_images[start_index:end_index]
+
+    for i, (tk_image, image_path, n) in enumerate(current_images):
+        frame = tk.Frame(scrollable_frame)
         button = tk.Button(
-            scrollable_frame,
+            frame,
             image=tk_image,
             command=lambda img=tk_image, path=image_path, num=n: show_selected_image(
                 img, path, num
             ),
         )
-        button.grid(
-            row=i // 10, column=i % 10, padx=5, pady=5
-        )  # Arrange images in a grid
+        button.pack()
+        image_name = image_path.name
+        label = tk.Label(frame, text=image_name)
+        label.pack()
+        frame.grid(row=i // 5, column=i % 5, padx=5, pady=5)
+
+    prev_button.config(state=tk.NORMAL if current_page > 0 else tk.DISABLED)
+    next_button.config(
+        state=tk.NORMAL if end_index < len(photo_images) else tk.DISABLED
+    )
+
+    page_indicator.config(
+        text=f"Page {current_page + 1} of {total_pages(photo_images)}"
+    )
 
 
-# Function to sort by Intensity
-# Function to sort by Intensity (distance calculation)
+def go_to_next_page():
+    global current_page
+    if (current_page + 1) * images_per_page < len(photo_images):
+        current_page += 1
+        display_images()
+
+
+def go_to_prev_page():
+    global current_page
+    if current_page > 0:
+        current_page -= 1
+        display_images()
+
+
+def total_pages(arr):
+    return (len(arr) + images_per_page - 1) // images_per_page
+
+
 def sort_by_distance(photo_arr, histogram):
-    global current_selected_img  # Access the global variable
+    global current_selected_img
     if current_selected_img[1] == -1:
         print("No image selected")
-        return  # Exit if no image is selected
+        return
     distances = []
-
-    selected_histogram = histogram[
-        current_selected_img[1]
-    ]  # Selected image's histogram
-
+    selected_histogram = histogram[current_selected_img[1]]
     for x in range(len(histogram)):
         calculated_distance = 0
         for y in range(len(histogram[x])):
@@ -88,102 +104,84 @@ def sort_by_distance(photo_arr, histogram):
             )
         distances.append(calculated_distance)
 
-    # Sorting photo_arr based on the calculated distances
-    sorted_photo_arr = [photo for _, photo in sorted(zip(distances, photo_arr))]
+    sorted_photo_arr = [
+        photo for _, photo in sorted(zip(distances, photo_arr), key=lambda x: x[0])
+    ]
 
-    # Update the global photo_images with the sorted array
-    photo_images[:] = sorted_photo_arr  # Update in place
-
-    # Display images in sorted order
+    photo_images[:] = sorted_photo_arr
     display_images()
-
-    photo_images[:] = sorted(photo_arr, key=lambda x: x[2])
 
 
 # Create the main window
 window = tk.Tk()
 window.title("100 Images Viewer")
+window.geometry("800x600")
+window.configure(bg="#f0f0f0")
+photo_images = []
+# Frame for the selected image and buttons
+top_frame = tk.Frame(window, bg="#e6e6e6", borderwidth=2, relief="solid")
+top_frame.pack(side="right", fill="y", padx=10, pady=10)
 
-# Create a frame for the selected image and buttons
-top_frame = tk.Frame(window)
-top_frame.pack(side="top", fill="x", padx=10, pady=10)  # Fill horizontally
+selected_image_label = tk.Label(
+    top_frame, text="No Image Selected", bg="white", borderwidth=2, relief="solid"
+)
+selected_image_label.pack(side="top", padx=10, pady=10, fill="both", expand=True)
 
-# Create a label to display the selected image
-selected_image_label = tk.Label(top_frame)
-selected_image_label.pack(side="left")  # Position it on the left of the frame
-
-# Create a frame for buttons
-button_frame = tk.Frame(top_frame)
-button_frame.pack(side="right", expand=True)  # Use expand to allow for centering
-
-rows, columns = 2, 1
+# Frame for buttons below the image display
+button_frame = tk.Frame(top_frame, bg="#e6e6e6")
+button_frame.pack(side="bottom", fill="both", expand=True)
 
 intensity_button = tk.Button(
     button_frame,
     text="Sort by Intensity",
-    width=15,
+    width=20,
     height=2,
+    bg="#d3d3d3",
+    fg="#000000",
     command=lambda: sort_by_distance(photo_images, intensity_histogram),
 )
-
-intensity_button.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+intensity_button.grid(row=0, column=0, padx=10, pady=5, sticky="nsew")
 
 colorcode_button = tk.Button(
     button_frame,
     text="Sort by Color Code",
-    width=15,
+    width=20,
     height=2,
+    bg="#87ceeb",
+    fg="#000000",
     command=lambda: sort_by_distance(photo_images, color_histogram),
 )
-colorcode_button.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
+colorcode_button.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
 
-# Configure grid weights to make it center
-for i in range(2):
-    button_frame.grid_rowconfigure(i, weight=1)  # Allow rows to expand
-for j in range(4):
-    button_frame.grid_columnconfigure(j, weight=1)  # Allow columns to expand
+# Previous and Next buttons
+prev_button = tk.Button(button_frame, text="Previous", command=go_to_prev_page)
+prev_button.grid(row=2, column=0, padx=10, pady=5, sticky="w")
 
-# Create a scrollable canvas
-canvas = Canvas(window)
-scrollbar = Scrollbar(window, orient="vertical", command=canvas.yview)
-scrollable_frame = Frame(canvas)
-
-scrollable_frame.bind(
-    "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+# Page indicator label
+page_indicator = tk.Label(
+    button_frame,
+    text=f"Page {current_page + 1} of {total_pages(photo_images)}",
+    bg="#e6e6e6",
 )
+page_indicator.grid(row=2, column=0, padx=10, pady=5)
 
-# Add the scrollable frame to the canvas
-canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-canvas.configure(yscrollcommand=scrollbar.set)
+next_button = tk.Button(button_frame, text="Next", command=go_to_next_page)
+next_button.grid(row=2, column=0, padx=10, pady=5, sticky="e")
 
-# Pack the canvas and scrollbar in the main window
-canvas.pack(side="left", fill="both", expand=True)
-scrollbar.pack(side="right", fill="y")
+# Create a scrollable frame for image thumbnails on the left
+scrollable_frame = Frame(window, bg="#f9f9f9")
+scrollable_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
 # Get the home directory of the user
 home_dir = Path.home()
-
-# Define a relative path from the home directory to the images folder
-image_folder = home_dir / "Python" / "images"
-
-# Use a wildcard to match .jpg images
+image_folder = home_dir / "css484yippee" / "images"
 image_paths = list(image_folder.glob("*.jpg"))
-
-# Limit to 100 images if there are more
 image_paths = image_paths[:100]
 
-# Keep a reference to the PhotoImage objects to avoid garbage collection
-photo_images = []
-
-# Define the maximum dimensions for the grid cells
-max_width, max_height = 160, 160
-
-# Define the target dimensions for the grid cells (150x150)
-target_size = 150
 counter = 0
+target_size = 190
 for image_path in image_paths:
-    img = Image.open(image_path)  # Open the image file
-    # Image Processing
+    img = Image.open(image_path)
     width, height = img.size
     pixels = img.load()
     for x in range(width):
@@ -217,35 +215,23 @@ for image_path in image_paths:
                 colorcode += 1
             color_histogram[counter][colorcode] += 1
 
-    # Get the original dimensions of the image
     width, height = img.size
-
-    # Determine the dimensions to crop a square
     if width > height:
-        # Crop width to make it a square
         left = (width - height) // 2
         right = left + height
         top, bottom = 0, height
     else:
-        # Crop height to make it a square
         top = (height - width) // 2
         bottom = top + width
         left, right = 0, width
 
-    # Crop the image to a square
     img = img.crop((left, top, right, bottom))
-
-    # Resize the square image to fit the grid cell
     img = img.resize((target_size, target_size), Image.Resampling.LANCZOS)
 
-    tk_image = ImageTk.PhotoImage(img)  # Convert image to PhotoImage
-    photo_images.append(
-        (tk_image, image_path, counter)
-    )  # Keep a reference and the file path
+    tk_image = ImageTk.PhotoImage(img)
+    photo_images.append((tk_image, image_path, counter))
     counter += 1
 
-# Display images initially
-photo_images.sort(key=lambda x: x[2])
+# Display the first page of images
 display_images()
-# Start the Tkinter event loop
 window.mainloop()
