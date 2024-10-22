@@ -3,6 +3,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 from pathlib import Path
 import random
+import os
 
 WIDTH = 384
 HEIGHT = 256
@@ -258,11 +259,13 @@ scrollable_frame = tk.Frame(window, bg="#f9f9f9")
 # Pack the scrollable frame in the main window
 scrollable_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
-# Get the home directory of the user
-home_dir = Path.home()
+folder_name = "images"  # Replace with your folder name
 
-# Define a relative path from the home directory to the images folder
-image_folder = home_dir / "css484yippee" / "images"
+# Create a Path object
+current_directory = Path.cwd()
+folder_path = current_directory / folder_name
+
+image_folder = folder_path
 
 # Use a wildcard to match .jpg images
 image_paths = list(image_folder.glob("*.jpg"))
