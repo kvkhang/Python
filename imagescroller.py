@@ -1,3 +1,4 @@
+import numpy as np
 from os import remove
 import tkinter as tk
 from PIL import Image, ImageTk
@@ -16,7 +17,7 @@ current_selected_img = ("", -1)
 current_page = 0
 images_per_page = 20
 columns_per_row = 5  # Number of columns to display
-rows_per_page = 4  # Number of rows per page
+rows_per_page = 4  # Number of ro bothws per pageand 
 
 # Adjust size for images
 target_size = 180  # Size of each thumbnail image
@@ -24,6 +25,10 @@ max_selected_size = 1200  # Maximum size for the selected image
 
 # Store the relevance of each image
 image_relevance = {}
+
+# Initialize feature weights
+intensity_weights = np.ones(cols) / cols  # Normalized initial weights for intensity
+color_weights = np.ones(64) / 64  # Normalized initial weights for color
 
 
 def randomize(arr):
@@ -96,6 +101,48 @@ def display_images():
         # Arrange the frame in a grid, with 5 columns
         frame.grid(row=i // columns_per_row, column=i % columns_per_row, padx=5, pady=5)
 
+def gaussian_normalize(features):
+    """Apply Gaussian normalization to features."""
+    features = np.array(features)
+    mean = np.mean(features, axis=0)
+    std = np.std(features, axis=0)
+    
+    # Handle zero standard deviation cases
+    min_nonzero_std = np.min(std[std > 0]) if np.any(std > 0) else 1
+    std[std == 0] = 0.5 * min_nonzero_std
+    
+    # Normalize features
+    normalized = (features - mean) / std
+    return normalized, mean, std
+
+def update_weights(normalized_features, relevant_indices):
+    """Update feature weights based on relevance feedback."""
+    if not relevant_indices:
+        return np.ones(normalized_features.shape[1]) / normalized_features.shape[1]
+    
+    relevant_features = normalized_features[relevant_indices]
+    
+    # Calculate standard deviation of relevant images
+    std_relevant = np.std(relevant_features, axis=0)
+    mean_relevant = np.mean(relevant_features, axis=0)
+    
+    # Handle special cases as per assignment requirements
+    min_nonzero_std = np.min(std_relevant[std_relevant > 0]) if np.any(std_relevant > 0) else 1
+    
+    weights = np.zeros(normalized_features.shape[1])
+    for i in range(len(weights)):
+        if std_relevant[i] == 0:
+            if mean_relevant[i] != 0:
+                std_relevant[i] = 0.5 * min_nonzero_std
+                weights[i] = 1 / std_relevant[i]
+            else:
+                weights[i] = 0
+        else:
+            weights[i] = 1 / std_relevant[i]
+    
+    # Normalize weights
+    weights = weights / np.sum(weights)
+    return weights
 
 def update_relevance(index, var):
     """Update the relevance state of an image."""
@@ -134,6 +181,64 @@ def sort_by_distance(photo_arr, histogram):
     photo_images[:] = sorted_photo_arr  # Update in place
 
     # Display images in sorted order
+    display_images()
+
+def calculate_weighted_distance(query_features, all_features, weights):
+    """Calculate weighted distance between query and all features."""
+    distances = np.zeros(len(all_features))
+    for i in range(len(all_features)):
+        diff = query_features - all_features[i]
+        distances[i] = np.sum(weights * np.abs(diff))
+    return distances
+
+def sort_by_distance_with_rf():
+    global current_selected_img, intensity_weights, color_weights
+    if current_selected_img[1] == -1:
+        print("No image selected")
+        return
+
+    # Get relevant images from user feedback
+    relevant_indices = [idx for idx, rel in image_relevance.items() if rel == 1]
+    
+    # Normalize histograms
+    normalized_intensity, _, _ = gaussian_normalize(intensity_histogram)
+    normalized_color, _, _ = gaussian_normalize(color_histogram)
+    
+    # Update weights based on relevant images
+    if relevant_indices:
+        intensity_weights = update_weights(normalized_intensity, relevant_indices)
+        color_weights = update_weights(normalized_color, relevant_indices)
+    
+    # Calculate distances using both features
+    query_idx = current_selected_img[1]
+    intensity_distances = calculate_weighted_distance(
+        normalized_intensity[query_idx], 
+        normalized_intensity, 
+        intensity_weights
+    )
+    color_distances = calculate_weighted_distance(
+        normalized_color[query_idx],
+        normalized_color,
+        color_weights
+    )
+    
+    # Combine distances (equal weight for both features)
+    combined_distances = 0.5 * intensity_distances + 0.5 * color_distances
+    
+    # Sort images based on combined distances
+    sorted_indices = np.argsort(combined_distances)
+    sorted_photo_arr = [photo_images[i] for i in sorted_indices]
+    
+    # Update the global photo_images with the sorted array
+    photo_images[:] = sorted_photo_arr
+    
+    # Calculate precision for top 20 images
+    if relevant_indices:
+        top_20_indices = sorted_indices[:20]
+        relevant_in_top_20 = sum(1 for idx in top_20_indices if idx in relevant_indices)
+        precision = relevant_in_top_20 / 20
+        print(f"Precision@20: {precision:.2f}")
+    
     display_images()
 
 
@@ -211,6 +316,18 @@ colorcode_button = tk.Button(
     command=lambda: sort_by_distance(photo_images, color_histogram),
 )
 colorcode_button.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
+
+# RF button
+rf_button = tk.Button(
+    button_frame,
+    text="Sort by Intensity & Color Code (RF)",
+    width=20,
+    height=2,
+    bg="#800080",
+    fg="#ffffff",
+    command=sort_by_distance_with_rf
+)
+rf_button.grid(row=1, column=1, padx=10, pady=5, sticky="nsew")
 
 # Reset Images button
 reset_button = tk.Button(
