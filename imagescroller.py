@@ -101,56 +101,61 @@ def display_images():
         # Arrange the frame in a grid, with 5 columns
         frame.grid(row=i // columns_per_row, column=i % columns_per_row, padx=5, pady=5)
 
+# Apply Gaussian normalization to feature set
 def gaussian_normalize(features):
     """Apply Gaussian normalization to features."""
     features = np.array(features)
+    # Calculate mean and standard deviation for each feature
     mean = np.mean(features, axis=0)
     std = np.std(features, axis=0)
     
-    # Handle zero standard deviation cases
+    # Handle cases where standard deviation is zero to avoid division errors
     min_nonzero_std = np.min(std[std > 0]) if np.any(std > 0) else 1
     std[std == 0] = 0.5 * min_nonzero_std
     
-    # Normalize features
+    # Normalize features by subtracting the mean and dividing by standard deviation
     normalized = (features - mean) / std
     return normalized, mean, std
 
+# Update feature weights based on relevance feedback from user
 def update_weights(normalized_features, relevant_indices):
     """
     Update feature weights based on relevance feedback.
-    Implements the special cases for standard deviation handling.
+    Implements special cases for handling standard deviations.
     """
+    # Return uniform weights if no relevant indices are provided
     if not relevant_indices:
         return np.ones(normalized_features.shape[1]) / normalized_features.shape[1]
     
+    # Extract features of relevant images
     relevant_features = normalized_features[relevant_indices]
     
-    # Calculate standard deviation and mean of relevant images
+    # Calculate standard deviation and mean for relevant features
     std_relevant = np.std(relevant_features, axis=0)
     mean_relevant = np.mean(relevant_features, axis=0)
     
-    # Get minimum non-zero standard deviation
+    # Find minimum non-zero standard deviation to handle zero cases
     nonzero_std = std_relevant[std_relevant > 0]
     min_nonzero_std = np.min(nonzero_std) if len(nonzero_std) > 0 else 1.0
     
-    # Initialize weights array
+    # Initialize weights array for each feature
     weights = np.zeros(normalized_features.shape[1])
     
-    # Handle special cases as per requirements
+    # Apply weight adjustments based on specific cases for zero standard deviation
     for i in range(len(weights)):
         if std_relevant[i] == 0:
             if mean_relevant[i] != 0:
-                # Case a: std is 0 but mean is not 0
+                # Case a: std is 0 but mean is not 0, use a scaled version of min non-zero std
                 std_relevant[i] = 0.5 * min_nonzero_std
                 weights[i] = 1 / std_relevant[i]
             else:
-                # Case b: both std and mean are 0
+                # Case b: both std and mean are 0, set weight to 0
                 weights[i] = 0
         else:
-            # Normal case: use 1/std as weight
+            # Normal case: weight is the inverse of the standard deviation
             weights[i] = 1 / std_relevant[i]
     
-    # Normalize weights to sum to 1
+    # Normalize weights so they sum to 1 for consistency
     if np.sum(weights) > 0:
         weights = weights / np.sum(weights)
     else:
@@ -158,12 +163,15 @@ def update_weights(normalized_features, relevant_indices):
     
     return weights
 
+# Update relevance state of an image based on user input
 def update_relevance(index, var):
     """Update the relevance state of an image."""
-    image_relevance[index] = var.get()
+    image_relevance[index] = var.get()  # Set relevance based on user selection
+    # If relevance is set to 0, remove the image from relevant list
     if var.get() == 0:
         image_relevance.pop(index)
-    print(image_relevance)
+    print(image_relevance)  # Display updated relevance for debugging/verification
+
 
 
 def sort_by_distance(photo_arr, histogram):
@@ -197,86 +205,98 @@ def sort_by_distance(photo_arr, histogram):
     # Display images in sorted order
     display_images()
 
-# Normalize histograms by image size
-def normalize_histograms() :
+# Normalize histograms by dividing each histogram value by the total number of pixels
+def normalize_histograms():
     global intensity_histogram, color_histogram
 
-    for i in range(rows): 
+    for i in range(rows):
+        # Total pixels in each image (constant for this context)
         total_pixels = WIDTH * HEIGHT
 
-        for j in range(cols) :
+        # Normalize intensity histogram by total pixels
+        for j in range(cols):
             intensity_histogram[i][j] = intensity_histogram[i][j] / total_pixels
-       
+
+        # Normalize color histogram by total pixels
         for j in range(64):
             color_histogram[i][j] = color_histogram[i][j] / total_pixels
 
+# Calculate weighted distance between query image features and all other features
 def calculate_weighted_distance(query_features, all_features, weights):
     """Calculate weighted distance between query and all features."""
+    # Initialize an array to store distances for each feature set
     distances = np.zeros(len(all_features))
     for i in range(len(all_features)):
-        # Calculate |Vi(I) - Vi(J)| for each feature
+        # Calculate absolute difference |Vi(I) - Vi(J)| for each feature
         feature_diff = np.abs(query_features - all_features[i])
-        # Multiply by weights and sum
+        # Compute weighted sum for the distance
         distances[i] = np.sum(weights * feature_diff)
     return distances
 
+# Sort images by distance using relevance feedback (RF)
 def sort_by_distance_with_rf():
     global current_selected_img, intensity_weights, color_weights
+
+    # Check if an image is selected
     if current_selected_img[1] == -1:
         print("No image selected")
         return
-    
-    # Get relevant images from user feedback
+
+    # Retrieve relevant images based on user feedback
     relevant_indices = [idx for idx, rel in image_relevance.items() if rel == 1]
-    
+
+    # Normalize histograms before calculating distances
     normalize_histograms()
 
-    # Convert histograms to numpy arrays for processing
+    # Convert intensity and color histograms to numpy arrays for easier processing
     intensity_features = np.array(intensity_histogram)
     color_features = np.array(color_histogram)
-    
-    # Normalize features using Gaussian normalization
+
+    # Apply Gaussian normalization to intensity and color features
     normalized_intensity, intensity_mean, intensity_std = gaussian_normalize(intensity_features)
     normalized_color, color_mean, color_std = gaussian_normalize(color_features)
-    
-    # Update weights if we have relevant images
+
+    # Update weights if there are relevant images selected by the user
     if relevant_indices:
         intensity_weights = update_weights(normalized_intensity, relevant_indices)
         color_weights = update_weights(normalized_color, relevant_indices)
-    
-    # Get query image features
+
+    # Get the features of the currently selected image (query image)
     query_idx = current_selected_img[1]
-    
-    # Calculate distances using the weighted formula
+
+    # Calculate weighted distances for intensity features
     intensity_distances = calculate_weighted_distance(
         normalized_intensity[query_idx],
         normalized_intensity,
         intensity_weights
     )
-    
+
+    # Calculate weighted distances for color features
     color_distances = calculate_weighted_distance(
         normalized_color[query_idx],
         normalized_color,
         color_weights
     )
-    
-    # Combine distances with equal weights
+
+    # Combine intensity and color distances with equal weights for final sorting
     combined_distances = 0.5 * intensity_distances + 0.5 * color_distances
-    
-    # Sort images based on combined distances
+
+    # Sort images based on the combined distances and update the global photo array
     sorted_indices = np.argsort(combined_distances)
     sorted_photo_arr = [photo_images[i] for i in sorted_indices]
-    
-    # Update the global photo_images with the sorted array
+
+    # Update photo_images to reflect the new sorted order
     photo_images[:] = sorted_photo_arr
-    
-    # Calculate and print precision for top 20 images
+
+    # Calculate and display precision metric for the top 20 images based on relevance
     if relevant_indices:
-        top_20_indices = sorted_indices[:20]
+        top_20_indices = sorted_indices[:20]  # Select top 20 images
+        # Count relevant images within the top 20 for precision calculation
         relevant_in_top_20 = sum(1 for idx in top_20_indices if idx in relevant_indices)
         precision = relevant_in_top_20 / 20
         print(f"Precision@20: {precision:.2f}")
-    
+
+    # Display images in the new sorted order
     display_images()
 
 
