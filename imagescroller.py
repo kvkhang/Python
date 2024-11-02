@@ -112,10 +112,15 @@ def get_stdev_average():
 
 def normalize():
     global color_intensity_histogram, stdev, average
-    min_nonzero_sstd = np.min(std[dev > 0]) if np.any(stdev > 0) else 1.0
-    for(j in range(len(stdev))):
+    min_nonzero_std = np.min(stdev[stdev > 0]) if np.any(stdev > 0) else 1.0
+    for j in range(len(stdev)):
         if stdev[j] == 0:
-        
+            if average[j] != 0:
+                stdev[j] = 0.5 * min_nonzero_std
+            else:
+                color_intensity_histogram[:, j + 2] = average[j]
+                continue
+    color_intensity_histogram[:, 2:] = (color_intensity_histogram[:, 2:] - average) / stdev
 
 def update_weights(normalized_features, relevant_indices):
     """
