@@ -12,6 +12,8 @@ rows, cols = 100, 25
 intensity_histogram = [[0 for _ in range(cols)] for _ in range(rows)]
 color_histogram = [[0 for _ in range(64)] for _ in range(rows)]
 current_selected_img = ("", -1)
+color_intensity_histogram = np.zeros((100, 89))
+
 
 # Pagination variables
 current_page = 0
@@ -29,7 +31,9 @@ image_relevance = {}
 # Initialize feature weights
 intensity_weights = np.ones(cols) / cols  # Normalized initial weights for intensity
 color_weights = np.ones(64) / 64  # Normalized initial weights for color
-
+stdev = []
+average = []
+feature = []
 
 def randomize(arr):
     random.shuffle(arr)
@@ -67,7 +71,7 @@ def display_images():
     images_to_display = photo_images[start_index:end_index]
 
     # Loop through photo_images to display the images as buttons
-    for i, (tk_image, image_path, n) in enumerate(images_to_display):
+    for i, (tk_image, image_path, n, k) in enumerate(images_to_display):
         # Create a frame to hold the button, checkbox, and the label
         frame = tk.Frame(scrollable_frame)
 
@@ -101,19 +105,17 @@ def display_images():
         # Arrange the frame in a grid, with 5 columns
         frame.grid(row=i // columns_per_row, column=i % columns_per_row, padx=5, pady=5)
 
-def gaussian_normalize(features):
-    """Apply Gaussian normalization to features."""
-    features = np.array(features)
-    mean = np.mean(features, axis=0)
-    std = np.std(features, axis=0)
-    
-    # Handle zero standard deviation cases
-    min_nonzero_std = np.min(std[std > 0]) if np.any(std > 0) else 1
-    std[std == 0] = 0.5 * min_nonzero_std
-    
-    # Normalize features
-    normalized = (features - mean) / std
-    return normalized, mean, std
+def get_stdev_average():
+    global stdev, average, color_intensity_histogram
+    stdev = np.std(color_intensity_histogram[:, 2:], axis=0)
+    average = np.mean(color_intensity_histogram[:, 2:], axis=0)
+
+def normalize():
+    global color_intensity_histogram, stdev, average
+    min_nonzero_sstd = np.min(std[dev > 0]) if np.any(stdev > 0) else 1.0
+    for(j in range(len(stdev))):
+        if stdev[j] == 0:
+        
 
 def update_weights(normalized_features, relevant_indices):
     """
@@ -198,17 +200,12 @@ def sort_by_distance(photo_arr, histogram):
     display_images()
 
 # Normalize histograms by image size
-def normalize_histograms() :
-    global intensity_histogram, color_histogram
-
+def normalize_histograms(histogram) :
     for i in range(rows): 
-        total_pixels = WIDTH * HEIGHT
+        total_pixels =  photo_images[i][3]
 
         for j in range(cols) :
-            intensity_histogram[i][j] = intensity_histogram[i][j] / total_pixels
-       
-        for j in range(64):
-            color_histogram[i][j] = color_histogram[i][j] / total_pixels
+            histogram[i][j] = histogram[i][j] / total_pixels
 
 def calculate_weighted_distance(query_features, all_features, weights):
     """Calculate weighted distance between query and all features."""
@@ -229,8 +226,6 @@ def sort_by_distance_with_rf():
     # Get relevant images from user feedback
     relevant_indices = [idx for idx, rel in image_relevance.items() if rel == 1]
     
-    normalize_histograms()
-
     # Convert histograms to numpy arrays for processing
     intensity_features = np.array(intensity_histogram)
     color_features = np.array(color_histogram)
@@ -363,7 +358,7 @@ rf_button = tk.Button(
     height=2,
     bg="#800080",
     fg="#ffffff",
-    command=sort_by_distance_with_rf
+    command=lambda: sort_by_distance(photo_images, color_intensity_histogram),
 )
 rf_button.grid(row=1, column=1, padx=10, pady=5, sticky="nsew")
 
@@ -479,11 +474,16 @@ for image_path in image_paths:
             elif rgbvals[2] >= 64:
                 colorcode += 1
             color_histogram[counter][colorcode] += 1
-
+    
     # Add the image to the list with its path and index
-    photo_images.append((tk_image, image_path, counter))
+    photo_images.append((tk_image, image_path, counter, width * height))
     counter += 1
 
+color_histogram = np.array(color_histogram)
+intensity_histogram = np.array(intensity_histogram)
+color_intensity_histogram = np.concatenate((intensity_histogram, color_histogram), axis=1)
+get_stdev_average()
+normalize()
 # Initial image display
 display_images()
 
